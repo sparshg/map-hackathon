@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">MapHackathon</string>
+    <string name="title_home">Pothole View</string>
+    <string name="title_dashboard">Information</string>
+    <string name="title_notifications">Sensor Collector</string>
+    <string name="record">RECORD</string>
+    <string name="data_app">To record data and collect labels (mark potholes) for training AI model, install <a href="http://www.cleverfinger.com.au/user-guide/">our other app</a></string>
+
+</resources>
