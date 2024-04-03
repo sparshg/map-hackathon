@@ -1,4 +1,4 @@
-# Maps
+# Maps [WIP]
 
 This branch contains the client side app. The uploads gyroscope and accelerometer data to the backend while using navigation. The backend updates the database after passing the data through the AI model and shows the potential potholes to other clients.
 
