@@ -25,7 +25,7 @@ def haversine(lat1, lon1, lat2, lon2):
 
 # Define column names
 columns = ['Timestamp', 'latitude', 'longitude','user_accelerometer_x', 'user_accelerometer_y', 'user_accelerometer_z',
-           'gyroscope_x', 'gyroscope_y', 'gyroscope_z', 'pothole', 'good_road']
+           'gyroscope_x', 'gyroscope_y', 'gyroscope_z']
 
 app = Flask(__name__)
 api = Api(app)
@@ -38,37 +38,28 @@ class Pothole(Resource):
         data_pair = request.data.decode('utf-8').split(',')
         lat = float(data_pair[0])
         lon = float(data_pair[1])
-        
-        # Read the dataframe
         lat_long_df = pd.read_csv('all_pothole_data.csv')
-        lat_long_df.columns = ['Latitude', 'Longitude', 'Prediction']  # Rename columns to match your expected names
-        # Calculate distance from each point in the dataframe
-        lat_long_df['distance'] = lat_long_df.apply(lambda row: haversine(lat, lon, row['Latitude'], row['Longitude']), axis=1)
-        
-        # Filter rows within 5m radius
+        lat_long_df.columns = ['Latitude', 'Longitude', 'Prediction']  
+        lat_long_df['distance'] = lat_long_df.apply(lambda row: haversine(lat, lon, row['Latitude'], row['Longitude']), axis=1)        
         nearest_points = lat_long_df[lat_long_df['distance'] <= 5]
 
         if not nearest_points.empty:
-            # Sort the dataframe by distance and get the nearest point
-            nearest_point = nearest_points.sort_values(by='distance').iloc[0]
-
-            # You can now return this nearest point or do further processing
-            print("Nearest point:", nearest_point['Latitude'], nearest_point['Longitude'])
-            return {'nearest_point': {'latitude': nearest_point['Latitude'], 'longitude': nearest_point['Longitude']}}
+            nearest_points = nearest_points.sort_values(by='distance')
+            nearest_points_list = nearest_points.to_dict('records')
+            return {'nearest points':nearest_points_list}
         else:
             print("No points within 5m radius")
             return {'message': 'No points within 5m radius'}
     
     def post(self):
         try:
-            # Convert bytes data to string
             data = request.data.decode('utf-8')
             data_io = StringIO(data)
             df = pd.read_csv(data_io, names=columns)
             print(df)
             mean_latitude_longitude = df[['latitude', 'longitude']].mean()
             pair = [mean_latitude_longitude['latitude'],mean_latitude_longitude['longitude']]
-            model_path = "/Users/yashmundada/Desktop/mapmyindia-apogee-hackathon/pothole-prophet/models/pothole_model.h5"
+            model_path = "models/pothole_model.h5"
             model = load_model(model_path)
             features = df[['user_accelerometer_x', 'user_accelerometer_y', 'user_accelerometer_z', 'gyroscope_x', 'gyroscope_y', 'gyroscope_z']]
             if features.shape[0] > 100:
@@ -78,13 +69,17 @@ class Pothole(Resource):
             input_data = features_subset.to_numpy().reshape((1, 100, 6, 1))
             prediction = model.predict(input_data)
             print(prediction)
-            new_data = ['mean_latitude', 'mean_longitude', 'predicition']
+            new_data = ['mean_latitude', 'mean_longitude', 'prediction']
             df_new = pd.DataFrame([[pair[0], pair[1], prediction[0][0]]], columns=new_data)
             df = pd.DataFrame(columns=df.columns)
             print(df)
             print(df_new)
-            df_new.to_csv('all_pothole_data.csv', mode='a', header=False, index=False)
-            return {'data received': f'prediction is, {prediction[0][0]}'}
+            if prediction>0.1:
+                df_new.to_csv('all_pothole_data.csv', mode='a', header=False, index=False)
+                return_message = "prediction was more than 0.1, added to the database"
+            else:
+                return_message = "Prediciton was less than 0.1, not added to database"
+            return {'data received': f'{return_message}. Prediction is, {prediction[0][0]}'}
         except Exception as e:
             return {'error': str(e)}
 
