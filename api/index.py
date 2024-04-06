@@ -26,7 +26,7 @@ def is_point_on_segment(point, segment_start, segment_end, tolerance):
         return False
 
 
-columns = ['Timestamp', 'latitude', 'longitude','user_accelerometer_x', 'user_accelerometer_y', 'user_accelerometer_z',
+columns = ['latitude', 'longitude','user_accelerometer_x', 'user_accelerometer_y', 'user_accelerometer_z',
            'gyroscope_x', 'gyroscope_y', 'gyroscope_z']
 
 
@@ -48,7 +48,7 @@ class Pothole(Resource):
             df = pd.read_csv(data_io, names=columns_for_get)
             nearest_points_all = []
             if df.shape[0] == 1:
-                return_message = "Only one point was provided, returning nearest points within 5m radius."
+                return_message = "Points"
                 for index, row in df.iterrows():
                     lat, lon = row['latitude'], row['longitude']
 
@@ -74,7 +74,7 @@ class Pothole(Resource):
                     print("No points within 5m radius")
                     return {'message': 'No points within 5m radius'}
             else:
-                return_message = "More than one point was provided, returning nearest points within 5m radius of the path provided."
+                return_message = "Points"
                 # want to get previous row data as well as current row data, from second row 
                 for index, row in df.iterrows():
                     if index == 0:
@@ -83,7 +83,7 @@ class Pothole(Resource):
                     lat2, lon2 = row['latitude'], row['longitude']
                     lat_long_df = pd.read_csv('all_pothole_data.csv')
                     lat_long_df.columns = ['Latitude', 'Longitude', 'Prediction']  
-                    lat_long_df['distance'] = lat_long_df.apply(lambda row: is_point_on_segment((row['Latitude'], row['Longitude']), (lat1, lon1), (lat2, lon2), tolerance=0.001), axis=1)
+                    lat_long_df['distance'] = lat_long_df.apply(lambda row: is_point_on_segment((row['Latitude'], row['Longitude']), (lat1, lon1), (lat2, lon2), tolerance=5), axis=1)
                     nearest_points = lat_long_df[(lat_long_df['distance'] == True) & (lat_long_df['Prediction'] > 0.1)]
                     if not nearest_points.empty:
                         nearest_points = nearest_points.sort_values(by='distance')
@@ -105,7 +105,7 @@ class Pothole(Resource):
             return {'error': str(e)}
     
     def reverse_geocode(self, latitude, longitude):
-        REST_KEY = "f429714a975db9e45c70ea3638235c17"  
+        REST_KEY = "490a70fb32ef272d74dc59c0bf7b731e"  
         base_url = "https://apis.mappls.com/advancedmaps/v1"
         url = f"{base_url}/{REST_KEY}/rev_geocode"
         params = {
@@ -157,7 +157,7 @@ class Pothole(Resource):
             if not nearby_potholes.empty:
                 # Calculate EMA of existing points
                 # Update the 'Prediction' column using EMA calculation
-                pothole_data.loc[pothole_data['distance'] <= 5, 'Prediction'] = (1 - 0.9) * pothole_data.loc[pothole_data['distance'] <= 5, 'Prediction'] + 0.9 * prediction
+                pothole_data.loc[pothole_data['distance'] <= 5, 'Prediction'] = 0.9 * pothole_data.loc[pothole_data['distance'] <= 5, 'Prediction'] + (1-0.9) * prediction
 
                 # Drop the 'distance' column
                 pothole_data.drop(columns=['distance'], inplace=True)
