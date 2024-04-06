@@ -4,8 +4,7 @@ import pandas as pd
 from io import StringIO
 from tensorflow.keras.models import load_model
 import numpy as np
-from math import radians, sin, cos, sqrt, atan2
-
+import requests,json
 
 def haversine(lat1, lon1, lat2, lon2):
     lat1, lon1, lat2, lon2 = np.radians([lat1, lon1, lat2, lon2])
@@ -26,10 +25,6 @@ def is_point_on_segment(point, segment_start, segment_end, tolerance):
     else:
         return False
 
-# if is_point_on_segment(given_point, segment_start, segment_end):
-#     print("The given point lies approximately on the line segment.")
-# else:
-#     print("The given point does not lie approximately on the line segment.")
 
 columns = ['Timestamp', 'latitude', 'longitude','user_accelerometer_x', 'user_accelerometer_y', 'user_accelerometer_z',
            'gyroscope_x', 'gyroscope_y', 'gyroscope_z']
@@ -38,10 +33,11 @@ columns = ['Timestamp', 'latitude', 'longitude','user_accelerometer_x', 'user_ac
 app = Flask(__name__)
 api = Api(app)
 
-
 class HelloWorld(Resource):
     def get(self):
         return {'how to use:': 'to call post, post on /potholes endpoint, similarly for to get yes/no for a particular location'}
+
+import requests
 
 class Pothole(Resource):
     def get(self):
@@ -51,7 +47,7 @@ class Pothole(Resource):
             columns_for_get = ['latitude', 'longitude']  
             df = pd.read_csv(data_io, names=columns_for_get)
             nearest_points_all = []
-            if df.shape[0] ==1:
+            if df.shape[0] == 1:
                 return_message = "Only one point was provided, returning nearest points within 5m radius."
                 for index, row in df.iterrows():
                     lat, lon = row['latitude'], row['longitude']
@@ -64,15 +60,21 @@ class Pothole(Resource):
                     if not nearest_points.empty:
                         nearest_points = nearest_points.sort_values(by='distance')
                         nearest_points_list = nearest_points.to_dict('records')
+
+                        # Perform reverse geocoding for each nearest point
+                        for point in nearest_points_list:
+                            reverse_geocode_result = self.reverse_geocode(point['Latitude'], point['Longitude'])
+                            point['reverse_geocode'] = reverse_geocode_result
+
                         nearest_points_all.extend(nearest_points_list)
 
                 if nearest_points_all:
-                    return {return_message+'Nearest points'}
+                    return {return_message: nearest_points_all}
                 else:
                     print("No points within 5m radius")
                     return {'message': 'No points within 5m radius'}
             else:
-                return_message = "more than one point was provided, returning nearest points within 5m radius of the path provided."
+                return_message = "More than one point was provided, returning nearest points within 5m radius of the path provided."
                 # want to get previous row data as well as current row data, from second row 
                 for index, row in df.iterrows():
                     if index == 0:
@@ -86,23 +88,52 @@ class Pothole(Resource):
                     if not nearest_points.empty:
                         nearest_points = nearest_points.sort_values(by='distance')
                         nearest_points_list = nearest_points.to_dict('records')
+
+                        # Perform reverse geocoding for each nearest point
+                        for point in nearest_points_list:
+                            reverse_geocode_result = self.reverse_geocode(point['Latitude'], point['Longitude'])
+                            point['reverse_geocode'] = reverse_geocode_result
+
                         nearest_points_all.extend(nearest_points_list)
+
                 if nearest_points_all:
-                    return {return_message+'Nearest points in 5m radius of the line segment provided': nearest_points_all}
+                    return {return_message: nearest_points_all}
                 else:
                     print("No points within 5m radius of the line segment provided.")
                     return {'message': 'No points within 5m radius of line segment provided'} 
         except Exception as e:
             return {'error': str(e)}
+    
+    def reverse_geocode(self, latitude, longitude):
+        REST_KEY = "f429714a975db9e45c70ea3638235c17"  
+        base_url = "https://apis.mappls.com/advancedmaps/v1"
+        url = f"{base_url}/{REST_KEY}/rev_geocode"
+        params = {
+            "lat": latitude,
+            "lng": longitude
+        }
+        headers = {
+            "Content-Type": "application/json"
+        }
+        response = requests.get(url, params=params, headers=headers)
+        if response.status_code == 200:
+            return response.json()  
+        else:
+            return None  
+
+    
+
+
 
     def post(self):
         try:
             data = request.data.decode('utf-8')
             data_io = StringIO(data)
             df = pd.read_csv(data_io, names=columns)
-            print(df)
+            print("Input data:", df)  
+            
             mean_latitude_longitude = df[['latitude', 'longitude']].mean()
-            pair = [mean_latitude_longitude['latitude'],mean_latitude_longitude['longitude']]
+            pair = [mean_latitude_longitude['latitude'], mean_latitude_longitude['longitude']]
             model_path = "models/model.h5"
             model = load_model(model_path)
             features = df[['user_accelerometer_x', 'user_accelerometer_y', 'user_accelerometer_z', 'gyroscope_x', 'gyroscope_y', 'gyroscope_z']]
@@ -112,20 +143,40 @@ class Pothole(Resource):
                 features_subset = features
             input_data = features_subset.to_numpy().reshape((1, 100, 6, 1))
             prediction = model.predict(input_data)
-            print(prediction)
-            new_data = ['mean_latitude', 'mean_longitude', 'prediction']
-            df_new = pd.DataFrame([[pair[0], pair[1], prediction[0][0]]], columns=new_data)
-            df = pd.DataFrame(columns=df.columns)
-            print(df)
-            print(df_new)
-            if prediction>0.1:
-                df_new.to_csv('all_pothole_data.csv', mode='a', header=False, index=False)
-                return_message = "prediction, added to the database"
+            prediction = prediction[0][0]
+            print("Prediction:", prediction)  
+            
+            pothole_data = pd.read_csv('all_pothole_data.csv')
+            print("Pothole data shape:", pothole_data.shape)  
+            print("Pothole data head:", pothole_data.head())   
+
+            pothole_data.columns = ['Latitude', 'Longitude', 'Prediction']
+            pothole_data['distance'] = pothole_data.apply(lambda row: haversine(float(pair[0]), float(pair[1]), float(row['Latitude']), float(row['Longitude'])), axis=1) 
+            nearby_potholes = pothole_data[pothole_data['distance'] <= 5]
+            
+            if not nearby_potholes.empty:
+                # Calculate EMA of existing points
+                # Update the 'Prediction' column using EMA calculation
+                pothole_data.loc[pothole_data['distance'] <= 5, 'Prediction'] = (1 - 0.9) * pothole_data.loc[pothole_data['distance'] <= 5, 'Prediction'] + 0.9 * prediction
+
+                # Drop the 'distance' column
+                pothole_data.drop(columns=['distance'], inplace=True)
+
+                # Save the modified DataFrame to CSV without the 'distance' column
+                pothole_data.to_csv('all_pothole_data.csv', index=False)
+
             else:
-                return_message = "Prediciton, not added to database"
-            return {'data received': f'{return_message}. Prediction is, {prediction[0][0]}'}
+                # Create df_new using lists instead of scalar values
+                df_new = pd.DataFrame({'Latitude': [pair[0]], 'Longitude': [pair[1]], 'Prediction': [prediction]})
+                df_new.to_csv('all_pothole_data.csv', mode='a', header=False, index=False)
+            
+            return_message = "Prediction added to the database"
+            
+            return {'data received': f'{return_message}. Prediction is {prediction}'}
         except Exception as e:
             return {'error': str(e)}
+
+
 
 
 
