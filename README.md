@@ -1,6 +1,8 @@
 # Maps
 
-This branch contains the client side app which shows nearby potholes, and also the data collection page app combined. It uploads gyroscope and accelerometer data to the backend while using navigation. The backend updates the database after passing the data through the AI model and shows the potential potholes to all clients.
+This branch contains the client side app which shows nearby potholes. It uploads gyroscope and accelerometer data to the backend while using navigation. The backend updates the database after passing the data through the AI model and shows the potential potholes to all clients.
+
+This app also contains a screen which was used to collect dataset for training the AI model
 
 # Other Codebases
 
