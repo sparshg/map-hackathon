@@ -8,4 +8,4 @@ This branch contains the client side app which shows nearby potholes, and also t
 
 # Download APK Here
 
-https://github.com/sparshg/maps/releases/tag/v0.1.0
+https://github.com/sparshg/maps/releases/tag/v0.2.0
