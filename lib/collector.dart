@@ -22,12 +22,13 @@ class CollectorPage extends StatefulWidget {
 }
 
 class _CollectorPageState extends State<CollectorPage> {
-  AccelerometerEvent? accelerometerEvent;
+  // AccelerometerEvent? accelerometerEvent;
   UserAccelerometerEvent? userAccelerometerEvent;
   GyroscopeEvent? gyroscopeEvent;
   bool recording = false;
   bool pothole = false;
   bool good_road = true;
+  bool speedbreaker = false;
 
   static List<String> csvHeader = [
     'Timestamp',
@@ -43,86 +44,94 @@ class _CollectorPageState extends State<CollectorPage> {
     'pothole',
     'good_road'
   ];
-  List<List<dynamic>> csvData = [csvHeader];
+  // List<List<dynamic>> csvData = [csvHeader];
+  // Timer? timer;
   // DoubleLinkedQueue<List<double>> csvData = DoubleLinkedQueue();
   // Interpreter? interpreter;
-
-  // void loadModel() async {
-  //   interpreter = await Interpreter.fromAsset('assets/model.tflite');
-  // }
+  StreamSubscription? gyroscopeSubscription, accelerometerSubscription;
 
   @override
   void initState() {
     super.initState();
     // loadModel();
-    accelerometerEventStream(samplingPeriod: SensorInterval.gameInterval)
-        .listen((AccelerometerEvent event) {
-      setState(() {
-        accelerometerEvent = event;
-      });
-    });
-    userAccelerometerEventStream(samplingPeriod: SensorInterval.gameInterval)
+    // accelerometerEventStream(samplingPeriod: SensorInterval.gameInterval)
+    //     .listen((AccelerometerEvent event) {
+    //   setState(() {
+    //     accelerometerEvent = event;
+    //   });
+    // });
+    accelerometerSubscription = userAccelerometerEventStream(
+            samplingPeriod: SensorInterval.gameInterval)
         .listen((UserAccelerometerEvent event) {
       setState(() {
         userAccelerometerEvent = event;
       });
     });
-    gyroscopeEventStream(samplingPeriod: SensorInterval.gameInterval)
-        .listen((GyroscopeEvent event) {
+    gyroscopeSubscription =
+        gyroscopeEventStream(samplingPeriod: SensorInterval.gameInterval)
+            .listen((GyroscopeEvent event) {
       setState(() {
         gyroscopeEvent = event;
       });
     });
 
-    Timer.periodic(const Duration(milliseconds: 20), (timer) {
-      if (recording) {
-        csvData.add([
-          DateTime.now().millisecondsSinceEpoch,
-          accelerometerEvent!.x,
-          accelerometerEvent!.y,
-          accelerometerEvent!.z,
-          userAccelerometerEvent!.x,
-          userAccelerometerEvent!.y,
-          userAccelerometerEvent!.z,
-          gyroscopeEvent!.x,
-          gyroscopeEvent!.y,
-          gyroscopeEvent!.z,
-          pothole,
-          good_road
-        ]);
-        // if (csvData.length > 100) {
-        //   csvData.removeFirst();
-        // }
-      }
+    // timer = Timer.periodic(const Duration(milliseconds: 20), (timer) {
+    //   if (recording) {
+    //     csvData.add([
+    //       DateTime.now().millisecondsSinceEpoch,
+    //       accelerometerEvent!.x,
+    //       accelerometerEvent!.y,
+    //       accelerometerEvent!.z,
+    //       userAccelerometerEvent!.x,
+    //       userAccelerometerEvent!.y,
+    //       userAccelerometerEvent!.z,
+    //       gyroscopeEvent!.x,
+    //       gyroscopeEvent!.y,
+    //       gyroscopeEvent!.z,
+    //       pothole,
+    //       good_road
+    //     ]);
+    //     // if (csvData.length > 100) {
+    //     //   csvData.removeFirst();
+    //     // }
+    //   }
 
-      // Timer.periodic(const Duration(seconds: 2), (timer) {
-      //   if (csvData.length < 100) {
-      //     return;
-      //   }
-      //   var input = csvData.toList().reshape([1, 100, 6, 1]);
-      //   var output = List.filled(1, 2).reshape([1, 1]);
-      //   interpreter!.run(input, output);
-      //   setState(() {
-      //     pothole = output[0][0] > 0.1;
-      //     confidence = output[0][0];
-      //   });
-      // });
-    });
+    //   // Timer.periodic(const Duration(seconds: 2), (timer) {
+    //   //   if (csvData.length < 100) {
+    //   //     return;
+    //   //   }
+    //   //   var input = csvData.toList().reshape([1, 100, 6, 1]);
+    //   //   var output = List.filled(1, 2).reshape([1, 1]);
+    //   //   interpreter!.run(input, output);
+    //   //   setState(() {
+    //   //     pothole = output[0][0] > 0.1;
+    //   //     confidence = output[0][0];
+    //   //   });
+    //   // });
+    // });
   }
 
-  Future<String> saveDataToCsv() async {
-    if (Platform.isAndroid &&
-        !await Permission.manageExternalStorage.request().isGranted) {
-      return "File Permission denied";
-    }
-    String csvData = const ListToCsvConverter().convert(this.csvData.toList());
-    final Directory directory = Platform.isAndroid
-        ? await getExternalStorageDirectory().then((value) => value!)
-        : await getApplicationDocumentsDirectory();
-    final String path = '${directory.path}/sensor_${DateTime.now()}.csv';
-    await File(path).writeAsString(csvData);
-    return path;
+  @override
+  void dispose() {
+    // timer?.cancel();
+    gyroscopeSubscription?.cancel();
+    accelerometerSubscription?.cancel();
+    super.dispose();
   }
+
+  // Future<String> saveDataToCsv() async {
+  //   if (Platform.isAndroid &&
+  //       !await Permission.manageExternalStorage.request().isGranted) {
+  //     return "File Permission denied";
+  //   }
+  //   String csvData = const ListToCsvConverter().convert(this.csvData.toList());
+  //   final Directory directory = Platform.isAndroid
+  //       ? await getExternalStorageDirectory().then((value) => value!)
+  //       : await getApplicationDocumentsDirectory();
+  //   final String path = '${directory.path}/sensor_${DateTime.now()}.csv';
+  //   await File(path).writeAsString(csvData);
+  //   return path;
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -137,15 +146,15 @@ class _CollectorPageState extends State<CollectorPage> {
                   setState(() {
                     if (recording) {
                       recording = false;
-                      saveDataToCsv().then((value) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Data saved to $value')));
-                      });
+                      // saveDataToCsv().then((value) {
+                      //   ScaffoldMessenger.of(context).showSnackBar(
+                      //       SnackBar(content: Text('Data saved to $value')));
+                      // });
                     } else {
                       recording = true;
                       // csvData = [csvHeader];
                     }
-                    csvData.clear();
+                    // csvData.clear();
                   });
                 },
                 style: ElevatedButton.styleFrom(
@@ -161,16 +170,16 @@ class _CollectorPageState extends State<CollectorPage> {
                         fontSize: 20.0))),
           ),
           const Spacer(flex: 50),
-          Text(
-            'Raw Accelerometer',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
+          // Text(
+          //   'Raw Accelerometer',
+          //   style: Theme.of(context).textTheme.headlineMedium,
+          // ),
+          // const Spacer(flex: 20),
+          // Text(
+          //   'x: ${accelerometerEvent?.x.toStringAsFixed(3)} \n y: ${accelerometerEvent?.y.toStringAsFixed(3)} \n z: ${accelerometerEvent?.z.toStringAsFixed(3)}',
+          //   style: Theme.of(context).textTheme.headlineSmall,
+          // ),
           const Spacer(flex: 20),
-          Text(
-            'x: ${accelerometerEvent?.x.toStringAsFixed(3)} \n y: ${accelerometerEvent?.y.toStringAsFixed(3)} \n z: ${accelerometerEvent?.z.toStringAsFixed(3)}',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const Spacer(flex: 50),
           Text(
             'Processed Accelerometer',
             style: Theme.of(context).textTheme.headlineMedium,
@@ -190,17 +199,57 @@ class _CollectorPageState extends State<CollectorPage> {
             'x: ${gyroscopeEvent?.x.toStringAsFixed(3)} \n y: ${gyroscopeEvent?.y.toStringAsFixed(3)} \n z: ${gyroscopeEvent?.z.toStringAsFixed(3)}',
             style: Theme.of(context).textTheme.headlineSmall,
           ),
-          const Spacer(flex: 20),
+          const Spacer(flex: 50),
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
               children: [
+                // Expanded(
+                //   flex: 1,
+                //   child: GestureDetector(
+                //     onTap: () {
+                //       setState(() {
+                //         good_road = !good_road;
+                //       });
+                //     },
+                //     child: Padding(
+                //       padding: const EdgeInsets.all(4.0),
+                //       child: Container(
+                //         height: 150,
+                //         decoration: BoxDecoration(
+                //             color: good_road
+                //                 ? Colors.green
+                //                 : Colors.yellow.shade800,
+                //             borderRadius: BorderRadius.circular(10)),
+                //         child: Center(
+                //           child: Text(good_road ? 'GOOD ROAD' : 'BAD ROAD',
+                //               textAlign: TextAlign.center,
+                //               style: const TextStyle(
+                //                   color: Colors.white,
+                //                   letterSpacing: 5.0,
+                //                   fontWeight: FontWeight.w900,
+                //                   fontSize: 20.0)),
+                //         ),
+                //       ),
+                //     ),
+                //   ),
+                // ),
                 Expanded(
                   flex: 1,
                   child: GestureDetector(
-                    onTap: () {
+                    onTapDown: (details) {
                       setState(() {
-                        good_road = !good_road;
+                        if (!recording) {
+                          recording = true;
+                          // csvData = [csvHeader];
+                          // csvData.clear();
+                        }
+                        speedbreaker = true;
+                      });
+                    },
+                    onTapUp: (details) {
+                      setState(() {
+                        speedbreaker = false;
                       });
                     },
                     child: Padding(
@@ -208,12 +257,15 @@ class _CollectorPageState extends State<CollectorPage> {
                       child: Container(
                         height: 150,
                         decoration: BoxDecoration(
-                            color: good_road
+                            color: speedbreaker
                                 ? Colors.green
                                 : Colors.yellow.shade800,
                             borderRadius: BorderRadius.circular(10)),
                         child: Center(
-                          child: Text(good_road ? 'GOOD ROAD' : 'BAD ROAD',
+                          child: Text(
+                              !speedbreaker
+                                  ? 'MARK SPEED BREAKER'
+                                  : 'MARKING...',
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                   color: Colors.white,
@@ -226,13 +278,13 @@ class _CollectorPageState extends State<CollectorPage> {
                   ),
                 ),
                 Expanded(
-                  flex: 2,
+                  flex: 1,
                   child: GestureDetector(
                     onTapDown: (details) {
                       setState(() {
                         if (!recording) {
                           recording = true;
-                          csvData = [csvHeader];
+                          // csvData = [csvHeader];
                           // csvData.clear();
                         }
                         pothole = true;
