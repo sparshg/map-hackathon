@@ -1,23 +1,3 @@
-"""
-model:
-
-32@4000x6 Conv2D(1)
-32@2000x6 Max-Pooling(1)
-64@2000x6 Conv2D(2)
-64@1000x6 Max-Pooling(2)
-64@1000x6 Conv2D(2)
-64@500x6 Max-Pooling(3)
-64@500x6 Conv2D(3)
-64@250x6 Max-Pooling(4)
-1x64
-1x1
-
-Conv(32,(5,5)) - ReLU - l2(0.0001) - MaxPooling - Dropout(0.3) Conv(64,(5,5)) - ReLU - l2(0.0001) - MaxPooling - Dropout(0.3) Conv(64,(5,5)) - ReLU - l2(0.0001) - MaxPooling - Dropout(0.3) Conv(64,(5,5)) - ReLU - l2(0.0001) - MaxPooling - Dropout(0.3) Flatten - Dense(64) - ReLU - Dropout(0.5) - Dense(1) - Sigmoid
-
-
-But we have data of shape (1600-2000, 6) for each trip. we can ignore 4000x6 for our model
-"""
-
 # %%
 import tensorflow as tf
 from tensorflow.keras import layers, models, regularizers
@@ -86,28 +66,10 @@ def build_model():
     )
     model.add(layers.MaxPooling2D((2, 2)))
     model.add(layers.Dropout(0.3))
-    # model.add(
-    #     layers.Conv2D(
-    #         64,
-    #         (3, 3),
-    #         activation="relu",
-    #         kernel_regularizer=regularizers.l2(0.0001),
-    #         padding="same",
-    #     )
-    # )
-    # model.add(layers.MaxPooling2D((2, 2)))
-    # model.add(layers.Dropout(0.3))
-    # model.add(
-    #     layers.Conv2D(
-    #         64, (5, 5), activation="relu", kernel_regularizer=regularizers.l2(0.0001)
-    #     )
-    # )
-    # model.add(layers.MaxPooling2D((2, 2)))
-    # model.add(layers.Dropout(0.3))
     model.add(layers.Flatten())
     model.add(layers.Dense(16, activation="relu"))
     model.add(layers.Dropout(0.5))
-    model.add(layers.Dense(1, activation="sigmoid"))
+    model.add(layers.Dense(2, activation="sigmoid"))
     return model
 
 
