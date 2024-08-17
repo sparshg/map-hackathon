@@ -1,5 +1,7 @@
 # Maps
 
+Blog about this hackathon: https://sparshg.dev/blogs/map-hackathon
+
 This branch contains the client side app which shows nearby potholes. It uploads gyroscope and accelerometer data to the backend while using navigation. The backend updates the database after passing the data through the AI model and shows the potential potholes to all clients.
 
 This app also contains a screen which was used to collect dataset for training the AI model
